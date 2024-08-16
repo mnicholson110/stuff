@@ -1,0 +1,4 @@
+github.com/achetronic/wizgo v0.1.0 h1:1XGb+K7LmTalZ75ABNIxz6AUOLnisN4XPPz2QWA4yOs=
+github.com/achetronic/wizgo v0.1.0/go.mod h1:SYFMRiLayvpt0qTNlQ33O/uaMWsQtQl4cZaAO1ruEOc=
+golang.org/x/exp v0.0.0-20230905200255-921286631fa9 h1:GoHiUyI/Tp2nVkLI2mCxVkOjsbSXD66ic0XW0js0R9g=
+golang.org/x/exp v0.0.0-20230905200255-921286631fa9/go.mod h1:S2oDrQGGwySpoQPVqRShND87VCbxmc6bL1Yd2oYrm6k=

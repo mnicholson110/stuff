@@ -1,0 +1,5 @@
+[default.general]
+chip = "nrf52833_xxAA"
+
+[default.reset]
+halt_afterwards = true

@@ -1,0 +1,7 @@
+databaseChangeLog:
+  - include:
+    - file: changeset/init.yml
+  - include:
+    - file: changeset/0.0.1.yml
+  - include:
+    - file: changeset/0.0.2.yml

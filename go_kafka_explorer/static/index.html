@@ -1,0 +1,37 @@
+<head>
+    <title>Home</title>
+    <link href="static/css/style.css" rel="stylesheet">
+    <script src="https://unpkg.com/htmx.org@1.9.6"></script>
+</head>
+<body>
+  <div id="schema-div"></div>
+  <form hx-post="/post" hx-target="#schema-div" hx-swap="innerHTML">
+    <div>
+      <label for="bootstrap">Bootstrap Servers</label>
+      <input type="text" id="bootstrap" name="bootstrap" required>
+    </div>
+    <div>
+      <label for="username">Username</label>
+      <input type="text" id="username" name="username" required>
+    </div>
+    <div>
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" required>
+    </div>
+    <div>
+      <label for="schema">Schema Registry URL</label>
+      <input type="text" id="schema" name="schema">
+    </div>
+    <div>
+      <label for="schemaUsername">Schema Registry Username</label>
+      <input type="text" id="schemaUsername" name="schemaUsername">
+    </div>
+    <div>
+      <label for="schemaPassword">Schema Registry Password</label>
+      <input type="text" id="schemaPassword" name="schemaPassword">
+    </div>
+    <div>
+      <button type="submit">Submit</button>
+    </div>
+  </form>
+</body>

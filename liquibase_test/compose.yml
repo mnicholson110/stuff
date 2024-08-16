@@ -1,0 +1,62 @@
+services:
+  postgres1:
+    image: postgres:latest
+    restart: always
+    hostname: postgres1
+    container_name: postgres1
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres1
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 3s
+      timeout: 5s
+      retries: 5
+
+  postgres2:
+    image: postgres:latest
+    restart: always
+    hostname: postgres2
+    container_name: postgres2
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres2
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 3s
+      timeout: 5s
+      retries: 5
+
+  liquibase:
+    image: liquibase:latest
+    entrypoint: sh
+    hostname: liquibase
+    container_name: liquibase
+    volumes:
+      - ./changelog:/liquibase/changelog
+    depends_on:
+      postgres1:
+        condition: service_healthy
+      postgres2:
+        condition: service_healthy 
+    command: >
+      -c "liquibase
+      --searchPath="./changelog" 
+      --changeLogFile=root_changelog1.yml 
+      --url=jdbc:postgresql://postgres1:5432/postgres1 
+      --username=postgres 
+      --password=postgres 
+      update
+      && liquibase
+      --searchPath="./changelog"
+      --changeLogFile=root_changelog2.yml
+      --url=jdbc:postgresql://postgres2:5432/postgres2 
+      --username=postgres
+      --password=postgres
+      update"

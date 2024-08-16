@@ -1,0 +1,13 @@
+[package]
+name = "jojo_lights"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+cortex-m-rt = "0.7.3"
+cortex-m-rtic = "1.1.4"
+microbit-v2 = "0.13.0"
+panic-halt = "0.2.0"
+rubble = "0.0.4"
