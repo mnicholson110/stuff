@@ -1,0 +1,147 @@
+Tuple-oriented storage
+    Insert a new tuple:
+        Check page dir to find a page with a free slot
+        Retrieve page from disk (if not in mem)
+        Check slot array to find empty space in page that will fit
+
+    Update a tuple:
+        Check page dir to find location of page
+        Retrieve page from disk (if not in mem)
+        Find offset in page from slot array
+        If new data fits, overwrite
+            else, mark existing tuple as deleted and insert in diff page
+
+
+    Problems:
+        Fragmentation
+            Pages are not full utilized
+        Useless Disk I/O
+            DBMS must fetch entire page to update one tuple
+        Random Disk I/O
+            Worse case scenario when updating multiple tuples is that each tuple is on a separate page
+        
+        What is the DBMS cannot overwrite data in pages (in-place) and could only create new pages
+            HDFS, some object stores
+
+Log-structured storage
+    Instead of storing tuples in pages, the DBMS maintains a log that records changes to tuples
+        Each log entry represents a tuple PUT or DELETE operation
+            Each record must contain the tuples unique identifier
+            PUT records contain the tuple contents
+            DELETE marks the tuple as deleted
+
+    The DBMS appends new log entries to an in-memory buffer, and then writes out changes sequentially to disk
+    When the in-memory page gets full, flush to disk, fill up next page with entries
+        All disk writes are sequential
+        On-disk pages are immutable
+    (The DBMS may do partial flushes for transactions)
+
+    To read a tuple given the ID, the DBMS finds the newest log record corresponding to that ID
+        Scan from newest to oldest
+
+    Maintain an index that maps an ID to the newest log record
+        If the record is in-memory, just read it
+        If the record is on a disk page, retrieve it
+    
+    DBMS periodically removes older entries in the log via compaction
+        After a page is compacted, the DBMS does not need to maintain temporal ordering of records within the page, as each tuple is guaranteed to appear once
+
+    The DBMS can instead sort the page based on id to improve future lookups
+        Called Sorted String tables (SSTables)
+        Embed indexes/filters in the header for reducing search times
+
+    Compaction:
+        Universal Compaction:
+            Pick 2 adjacent log files and compact them
+        Level Compaction:
+            Combine smaller log files at level x to larger logs at level x+1
+
+Observation:
+    Both storage options (tuple-oriented and log-structured) rely on indexes to find the individual tuples
+        Indexes are required because the tuples are unsorted
+
+    What if the DBMS could keep tuples sorted automatically
+
+Index-organized storage
+    DBGMS stores a tuple as the value of an index data structure
+        Still uses a page layout that looks like a slotted page
+    Tuples are typically sorted in page based on key
+
+Tuple storage
+    Tuples are just a sequence of bytes
+    The DBMS has to interpret those bytes
+
+
+    Word-aligned tuples
+        All attributes in a tuple must be word aligned to enable the CPU to access it without any UB or additional work
+
+        Padding:
+            Add 0 to increase attribute size to 8byte (64bit)
+
+        Reordering:
+            Move tuple attributes to align with word size
+
+Data Representation
+    INTEGER/BIGINT/SMALLINT/TINYINT
+        Same as in C/C++
+    FLOAT/REAL vs. NUMERIC/DECIMAL
+        IEEE-754 Standard / Fixed-point decimals
+    VARCHAR/VARBINARY/TEXT/BLOB
+        Header with length, followed by data bytes OR pointer to another page/offset with data
+        Need to worry about collations/sorting
+    TIME/DATE/TIMESTAMP/INTERVAL
+        64-bit integer of ms since Unix epoch (1/1/70)
+
+
+
+    Variable Precision Numbers
+        FLOAT, REAL, DOUBLE come directly from IEEE-754 (same as C/C++)
+        Typically faster than fixed precision numbers because of hw support
+
+    Fixed Precision Numbers
+        Numeric data types with arbitrary precision and scale
+        Used when rounding errors are unacceptable
+            NUMERIC, DECIMAL
+
+    NULL Data Types
+        Choice 1: Bitmap
+            Store a bitmap in header that specifies which attributes are NULL
+            Most common approach
+
+        Choice 2: Special Values
+            Designate a value to represent NULL for a given type (eg, INT32_MIN)
+
+        Choice 3: Per Attribute NULL Flag
+            Store a flag that marks NULL at each value
+            Must use more space than just a bit because of word alignment
+
+    Large Values
+        Most don't allow a tuple to exceed the size of a single page
+
+        To store values that are larger than a page, the DBMS uses separate overflow pages
+            Postgres: TOAST (>2KB)
+            MySQL: Overflow (>0.5 size of page)
+            SQL Server: Overflow (> size of page)
+
+    External Value Storage
+        Some systems allow you to store a large value in an external file
+        Treated as a BLOB type
+            Oracle: BFILE type
+            MS: FILESTREAM type
+        
+        DBMS cannot manipulate the contents of an external file
+            No durability
+            No transactions
+
+
+
+
+
+
+
+
+
+
+
+
+

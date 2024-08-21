@@ -1,0 +1,66 @@
+Memory and Disk I/O
+    How the DBMS manages its memory and move data back and forth from disk
+
+
+Database storage
+    Spatial Control
+        Where to write pages on disk
+        Keep pages that ar eused together often as physically close as possible
+
+    Temporal Control
+        When to read pages into memory, and when to write them to disk
+        Minimize the number of stalls from having to read data from disk
+
+Buffer Pool Organization
+    Memory region organized as an array of fixed-size pages
+    An array entry is called a *frame*
+
+    When the DBMS requests a page, an exact copy is place into one of these frames
+    Dirty pages are buffered and not written to disk immediately
+        Write-back cache
+
+Buffer Pool Meta-Data
+    The *page table* keeps track of pages that are currently in memory
+        Usually a fixed-size hash table protected with latches (not a lock) to ensure thread-safe access
+
+    Additional meta-data per page:
+        Dirty flag
+        Pin/Reference Counter
+        Access Tracking Information
+
+Locks vs Latches
+    Locks:
+        Protects the dbs logical contents from other transactions
+        Held for transaction duration
+        Need to be able to rollback changes
+    Latches
+        Protects the critical sections of the DBMS's internal data structure from other threads
+        Held of operation duration
+        Do not need to be able to rollback changes
+
+Page Table vs Page Directory
+    The Page Directory is the mapping from page ids to page locations in the database diles
+        All changes must be recorded on disk to allow the DBMS to find on restart
+    The Page Table is the mapping from page ids to a copy of the page in buffer pool frames
+        The is an in-memory data struct that does not need to be flushed to disk
+
+Allocation Policies
+    Global Policies    
+        Make decisions for all active queries
+    Local Policies 
+        Allocate frames to a specific queries without considering the behavior of concurrent queries
+        Still need to support sharing pages
+
+Buffer Pool Optimizations
+    Multiple Buffer Pools
+    Pre-Fetching
+    Scan Sharing
+    Buffer Pool Bypass
+
+Multiple Buffer Pools
+    DBMS does not always have a single buffer pool for the entire system
+        Multiple buffer pool instances
+        Per-DB buffer pool
+        Per-page type buffer pool
+
+    Partitioning memory across multiple pools helps reduce latch contention and improve locality
