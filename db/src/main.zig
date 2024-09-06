@@ -1,5 +1,41 @@
 const std = @import("std");
 
+const PAGE_SIZE: u16 = 8192;
+
+const diskpage = extern struct {
+    // LAYOUT
+    // Header should contain:
+    //    PageID: u16?
+    //    Tuple Size in bytes: u32?
+    //    Offset to first tuple: u16?
+    //    MAX DATA SIZE = PAGE_SIZE - 14
+    page_id: u16 align(1),
+    tuple_size: u32 align(1),
+    num_tuples: u32 align(1),
+    free_tuple_offset: u32 align(1),
+    data: [PAGE_SIZE - 14]u8 align(1),
+
+    // need checks on all kinds of shit here
+    pub fn add_tuple(self: *diskpage, tuple: []const u8) void {
+        var offset = self.free_tuple_offset;
+        if (offset == 0) { // means no data, insert at end of page
+            self.free_tuple_offset = PAGE_SIZE - self.tuple_size - 15;
+            offset = self.free_tuple_offset;
+        }
+        @memcpy(self.data[offset .. offset + self.tuple_size], tuple);
+        self.free_tuple_offset -= self.tuple_size;
+        self.num_tuples += 1;
+    }
+
+    pub fn get_tuple(self: *diskpage, tuple_num: u8) []u8 {
+        //std.debug.print("{any}: PAGE_SIZE\n", .{PAGE_SIZE});
+        //std.debug.print("{any}: tuple_num\n", .{tuple_num});
+        //std.debug.print("{any}: tuple_size\n", .{self.tuple_size});
+        const offset: u32 = PAGE_SIZE - ((tuple_num + 1) * self.tuple_size) - 15;
+        return self.data[offset .. offset + self.tuple_size];
+    }
+};
+
 const diskmanager = struct {
     // TODO: add error handling throughout
     filepath: []const u8,
@@ -9,15 +45,23 @@ const diskmanager = struct {
         self.db_file = try std.fs.cwd().createFile(self.filepath, .{ .read = true });
     }
 
-    fn write_page(self: *diskmanager, page_id: u32, page_data: []const u8) !void {
-        const offset: u64 = page_id * 4096;
-        _ = try self.db_file.pwrite(page_data, offset);
+    fn write_page(self: *diskmanager, page: *diskpage) !void {
+        const offset: u64 = page.page_id * PAGE_SIZE;
+        _ = try self.db_file.pwrite(std.mem.asBytes(page), offset);
         try self.db_file.sync();
     }
 
-    fn read_page(self: *diskmanager, page_id: u32, page_data: []u8) !void {
-        const offset: u64 = page_id * 4096;
-        _ = try self.db_file.pread(page_data, offset);
+    fn read_page(self: *diskmanager, page_id: u16, buffer: []u8) !diskpage {
+        const offset: u64 = page_id * PAGE_SIZE;
+        _ = try self.db_file.pread(buffer, offset);
+        //doesnt work: const page = std.mem.bytesToValue(diskpage, &buffer);
+        var page: diskpage = undefined;
+        page.page_id = std.mem.readInt(u16, buffer[0..2], std.builtin.Endian.little);
+        page.tuple_size = std.mem.readInt(u32, buffer[2..6], std.builtin.Endian.little);
+        page.num_tuples = std.mem.readInt(u32, buffer[6..10], std.builtin.Endian.little);
+        page.free_tuple_offset = std.mem.readInt(u32, buffer[10..14], std.builtin.Endian.little);
+        @memcpy(&page.data, buffer[14..PAGE_SIZE]);
+        return page;
     }
 
     fn close(self: *diskmanager) void {
@@ -73,22 +117,32 @@ pub fn main() !void {
 
     try dm.open();
 
-    const buf = try std.heap.page_allocator.alloc(u8, 4096);
+    // TODO: add buffer manager to handle allocations + pages
+    const buf = try std.heap.page_allocator.alloc(u8, PAGE_SIZE);
     defer std.heap.page_allocator.free(buf);
 
-    try dm.write_page(1, std.mem.asBytes(&one));
-    try dm.write_page(2, std.mem.asBytes(&two));
-    try dm.write_page(0, std.mem.asBytes(&three));
+    var page1: diskpage = .{ .page_id = 0, .tuple_size = 64, .num_tuples = 0, .free_tuple_offset = 0, .data = undefined };
+    page1.add_tuple(std.mem.asBytes(&one));
+    page1.add_tuple(std.mem.asBytes(&two));
+    page1.add_tuple(std.mem.asBytes(&three));
+    try dm.write_page(&page1);
 
-    try dm.read_page(1, buf);
-    const one_from_buf = std.mem.bytesToValue(TestRecord, buf);
-    std.debug.print("{any}\n", .{one_from_buf});
+    //try dm.read_page(0, buf);
+    var page1_from_disk = try dm.read_page(0, buf);
+    //std.debug.print("page_id: {any}\n", .{std.mem.readInt(u16, buf[0..2], std.builtin.Endian.little)});
+    //std.debug.print("tuple_size: {any}\n", .{std.mem.readInt(u32, buf[2..6], std.builtin.Endian.little)});
 
-    try dm.read_page(2, buf);
-    const two_from_buf = std.mem.bytesToValue(TestRecord, buf);
-    std.debug.print("{any}\n", .{two_from_buf});
+    const one_from_disk = std.mem.bytesToValue(TestRecord, page1_from_disk.get_tuple(0));
+    std.debug.print("{any}\n", .{one_from_disk});
 
-    try dm.read_page(0, buf);
-    const three_from_buf = std.mem.bytesToValue(TestRecord, buf);
-    std.debug.print("{any}\n", .{three_from_buf});
+    const two_from_disk = std.mem.bytesToValue(TestRecord, page1_from_disk.get_tuple(1));
+    std.debug.print("{any}\n", .{two_from_disk});
+
+    const three_from_disk = std.mem.bytesToValue(TestRecord, page1_from_disk.get_tuple(2));
+    std.debug.print("{any}\n", .{three_from_disk});
+}
+
+test {
+    std.debug.print("Size of diskpage: {any}\n", .{@sizeOf(diskpage)});
+    try std.testing.expectEqual(PAGE_SIZE, @sizeOf(diskpage));
 }
