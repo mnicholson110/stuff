@@ -11,10 +11,10 @@
 typedef struct BufferPool BufferPool;
 struct BufferPool
 {
-    Page page_buffers[NUM_BUFFERS];
-    uint8_t in_use[NUM_BUFFERS];     // 1 if the buffer is in use, 0 otherwise
-    uint32_t page_dir[NUM_BUFFERS];  // Keeps track of which page is stored in
-                                     // each buffer
+  Page page_buffers[NUM_BUFFERS];
+  uint8_t in_use[NUM_BUFFERS];    // 1 if the buffer is in use, 0 otherwise
+  uint32_t page_dir[NUM_BUFFERS]; // Keeps track of which page is stored in
+                                  // each buffer
 };
 
 BufferPool *create_buffer_pool();
