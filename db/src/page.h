@@ -7,12 +7,12 @@
 typedef struct Page Page;
 struct Page
 {
-  uint32_t page_id;                      // Page identifier
-  uint32_t tuple_size;                   // Size of tuples in this page, in bytes TODO: handle
-                                         // dynamic sizes; ptrs to overflow?
-  uint32_t num_tuples;                   // Number of tuples currently in this page
-  uint32_t free_offset;                  // Offset to free space between offset array and tuples
-  uint8_t data[PAGE_SIZE - HEADER_SIZE]; // Tuple data and slot array
+    uint32_t page_id;                      // Page identifier
+    uint32_t tuple_size;                   // Size of tuples in this page, in bytes TODO: handle
+                                           // dynamic sizes; ptrs to overflow?
+    uint32_t num_tuples;                   // Number of tuples currently in this page
+    uint32_t free_offset;                  // Offset to free space between offset array and tuples
+    uint8_t data[PAGE_SIZE - HEADER_SIZE]; // Tuple data and slot array
 };
 //
 //  Page:

@@ -7,8 +7,8 @@
 typedef struct DiskManager DiskManager;
 struct DiskManager
 {
-  const char *filepath;
-  int db_fd;
+    const char *filepath;
+    int db_fd;
 };
 
 DiskManager *create_disk_manager(const char *filepath);
