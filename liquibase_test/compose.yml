@@ -52,11 +52,13 @@ services:
       --url=jdbc:postgresql://postgres1:5432/postgres1 
       --username=postgres 
       --password=postgres 
+      --contexts="db1"
       update
       && liquibase
       --searchPath="./changelog"
-      --changeLogFile=root_changelog2.yml
+      --changeLogFile=root_changelog1.yml
       --url=jdbc:postgresql://postgres2:5432/postgres2 
       --username=postgres
       --password=postgres
+      --contexts="db2"
       update"

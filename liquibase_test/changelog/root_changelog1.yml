@@ -1,7 +1,9 @@
 databaseChangeLog:
   - include:
     - file: changeset/init.yml
+    - context: db1 or db2 
   - include:
     - file: changeset/0.0.1.yml
   - include:
     - file: changeset/0.0.2.yml
+    - context: db1 or db2
