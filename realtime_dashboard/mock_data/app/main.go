@@ -60,18 +60,18 @@ func main() {
 	generateStoreArray()
 	generateOrders(initial_order_count_k)
 	fmt.Println("Finished generating initial orders in", time.Since(start).Seconds(), "seconds.")
-	order_count = initial_order_count_k * 1000
+	order_count = initial_order_count_k
 
 	for {
 		start = time.Now()
 		updateOrders()
 		fmt.Println("Finished updating orders in", time.Since(start).Seconds(), "seconds.")
-		time.Sleep(5 * time.Second)
+		time.Sleep(250 * time.Millisecond)
 
 		start = time.Now()
 		generateOrders(new_order_count_k)
 		fmt.Println("Finished generating new orders in", time.Since(start).Seconds(), "seconds.")
-		order_count += new_order_count_k * 1000
+		order_count += new_order_count_k
 
 	}
 }
@@ -96,10 +96,10 @@ func generateOrders(order_count int) {
 
 	// generate orders concurrently
 	var wg sync.WaitGroup
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < order_count; i++ {
 		wg.Add(1)
 		go func() {
-			for i := 0; i < order_count; i++ {
+			for i := 0; i < 1000; i++ {
 
 				store := stores[rand.Intn(store_count)]
 
@@ -132,8 +132,8 @@ func updateOrders() {
 		panic(err)
 	}
 
-	// get a random int between 100 and 3000 to cancel orders
-	cancel_order_count := rand.Intn(3000-100) + 100
+	// get a random int between 100 and 300 to cancel orders
+	cancel_order_count := rand.Intn(300-100) + 100
 
 	// cancel orders
 	_, err = db.Exec(`UPDATE order_schema.order
@@ -178,7 +178,6 @@ func updateOrders() {
 		_, err = db.Exec(sql)
 		if err != nil {
 			panic(err)
-			fmt.Println(sql)
 		}
 	}
 }

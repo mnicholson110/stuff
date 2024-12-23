@@ -1,7 +1,0 @@
-com/gemini/JsonDeserializer.class
-com/gemini/CdcEvent.class
-com/gemini/StoreAggregationApp.class
-com/gemini/StoreAggregation.class
-com/gemini/ParsedOrder.class
-com/gemini/JsonSerializer.class
-com/gemini/CdcParser.class

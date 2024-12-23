@@ -20,6 +20,24 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
+  kafka-init:
+    image: confluentinc/cp-kafka:latest
+    hostname: kafka-init
+    container_name: kafka-init
+    depends_on:
+      - kafka
+    entrypoint: [ '/bin/sh', '-c' ]
+    command: |
+      "
+      kafka-topics --bootstrap-server kafka:29092 --list
+
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic aggregated_store_orders --replication-factor 1 --partitions 3
+
+
+      echo -e 'Successfully created the following topics:'
+      kafka-topics --bootstrap-server kafka:29092 --list
+      "
+
   postgres:
     image: postgres:latest
     restart: always
@@ -102,7 +120,7 @@ services:
                       "plugin.name": "pgoutput",
                       "topic.creation.default.replication.factor": 1,
                       "topic.creation.enable": "true",
-                      "topic.creation.default.partitions": 1,
+                      "topic.creation.default.partitions": 3,
                       "decimal.handling.mode": "string",
                       "key.converter": "org.apache.kafka.connect.json.JsonConverter",
                       "key.converter.schemas.enable": "false",
@@ -124,9 +142,9 @@ services:
     container_name: mock-data
     restart: no
     environment:
-      INITIAL_ORDER_COUNT_K: 10
-      ORDER_UPDATE_COUNT_K: 3
-      NEW_ORDER_COUNT_K: 1
+      INITIAL_ORDER_COUNT_K: 50
+      ORDER_UPDATE_COUNT_K: 5
+      NEW_ORDER_COUNT_K: 5
       HOST: postgres
       PORT: 5432
       USER: postgres
@@ -150,23 +168,11 @@ services:
     depends_on:
       - kafka
 
-  streams-app:
-    container_name: streams-app
-    build: 
-      context: ./streams_app
-      dockerfile: Dockerfile
-    depends_on:
-      - kafka
-      - debezium
-      - debezium-init
-      - mock-data
-    restart: on-failure
-
   dashboard:
     container_name: dashboard
     hostname: dashboard
     build: 
-      context: ./web
+      context: ./dashboard
       dockerfile: Dockerfile
     ports:
       - "8081:8081"
@@ -176,5 +182,4 @@ services:
       - debezium
       - debezium-init
       - mock-data
-      - streams-app
     restart: on-failure
