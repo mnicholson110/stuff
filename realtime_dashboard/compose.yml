@@ -20,24 +20,6 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
-  kafka-init:
-    image: confluentinc/cp-kafka:latest
-    hostname: kafka-init
-    container_name: kafka-init
-    depends_on:
-      - kafka
-    entrypoint: [ '/bin/sh', '-c' ]
-    command: |
-      "
-      kafka-topics --bootstrap-server kafka:29092 --list
-
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic aggregated_store_orders --replication-factor 1 --partitions 3
-
-
-      echo -e 'Successfully created the following topics:'
-      kafka-topics --bootstrap-server kafka:29092 --list
-      "
-
   postgres:
     image: postgres:latest
     restart: always
