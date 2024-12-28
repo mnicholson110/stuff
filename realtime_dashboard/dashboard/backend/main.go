@@ -13,53 +13,24 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
 
-// Structs for incoming Kafka messages
-type Message struct {
-	OrderId    uint   `json:"order_id"`
-	Data       string `json:"data"` // Handle as raw JSON string
-	CreatedAt  string `json:"created_at"`
-	UpdatedAt  string `json:"updated_at"`
-	SourceTsMs uint64 `json:"__source_ts_ms"`
-}
-
-type MessageData struct {
-	Order OrderData `json:"order"`
-	Store StoreData `json:"store"`
-}
-
-type OrderData struct {
-	OrderAmount   float32 `json:"order_amount"`
-	OrderStatus   string  `json:"order_status"`
-	OrderStatusId int     `json:"order_status_id"`
-}
-
-type StoreData struct {
-	StoreId   int    `json:"store_id"`
-	StoreLoc  Loc    `json:"store_loc"`
-	StoreAddr string `json:"store_addr"`
-}
-
-type Loc struct {
-	Lat  float32 `json:"store_lat"`
-	Long float32 `json:"store_long"`
-}
-
-// Struct for aggregated store data
 type AggregatedStoreData struct {
-	StoreId          int     `json:"store_id"`
+	StoreId          string  `json:"store_id"`
 	OrderCount       int     `json:"order_count"`
 	TotalOrderAmount float32 `json:"total_order_amount"`
-	StoreAddr        string  `json:"store_addr"`
 	Lat              float32 `json:"lat"`
-	Long             float32 `json:"long"`
+	Lng              float32 `json:"lng"`
 }
 
-// State management
-var storeData = make(map[int]*AggregatedStoreData)
+type AggregatedAllStoreData struct {
+	AllStoreTotalOrderCount  int     `json:"all_store_total_order_count"`
+	AllStoreTotalOrderAmount float32 `json:"all_store_total_order_amount"`
+}
+
+var storeData = make(map[string]AggregatedStoreData)
 var storeMux sync.RWMutex
 var broadcast = make(chan []byte)
+var allStoreData = AggregatedAllStoreData{0, 0}
 
-// Kafka consumer
 func runKafkaConsumer(ctx context.Context, broker string, topic string, groupID string) {
 	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
 		"bootstrap.servers": broker,
@@ -88,57 +59,25 @@ func runKafkaConsumer(ctx context.Context, broker string, topic string, groupID 
 				continue
 			}
 
-			var message Message
-			// Unmarshal the raw message first
+			var message AggregatedStoreData
 			if err := json.Unmarshal(msg.Value, &message); err != nil {
 				log.Printf("Failed to unmarshal message: %v", err)
 				continue
 			}
 
-			// Unmarshal the stringified "data" field
-			var messageData MessageData
-			if err := json.Unmarshal([]byte(message.Data), &messageData); err != nil {
-				log.Printf("Failed to unmarshal data field: %v", err)
-				continue
-			}
-
-			// Filter for "Delivered" orders
-			if messageData.Order.OrderStatus != "Delivered" {
-				continue
-			}
-
-			// Aggregate state
-			storeID := messageData.Store.StoreId
+			storeID := message.StoreId
 			storeMux.Lock()
-			if _, exists := storeData[storeID]; !exists {
-				storeData[storeID] = &AggregatedStoreData{
-					StoreId:          storeID,
-					StoreAddr:        messageData.Store.StoreAddr,
-					Lat:              messageData.Store.StoreLoc.Lat,
-					Long:             messageData.Store.StoreLoc.Long,
-					OrderCount:       0,
-					TotalOrderAmount: 0,
-				}
-			}
-			storeData[storeID].OrderCount++
-			storeData[storeID].TotalOrderAmount += messageData.Order.OrderAmount
+			storeData[storeID] = message
 			storeMux.Unlock()
 
-			// Broadcast update over SSE
-			updatedData, err := json.Marshal(storeData[storeID])
-			if err != nil {
-				log.Printf("Failed to marshal aggregated data: %v", err)
-				continue
-			}
 			select {
-			case broadcast <- updatedData:
-			default: // No active connections; drop the message
+			case broadcast <- msg.Value:
+			default:
 			}
 		}
 	}
 }
 
-// SSE Handler
 func sseHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -167,7 +106,6 @@ func sseHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Snapshot Handler
 func snapshotHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	storeMux.RLock()
@@ -178,9 +116,27 @@ func snapshotHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Serve React App
+func allStoreHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	storeMux.RLock()
+
+	allStoreData.AllStoreTotalOrderCount = 0
+	allStoreData.AllStoreTotalOrderAmount = 0.0
+
+	for _, store := range storeData {
+		allStoreData.AllStoreTotalOrderCount += store.OrderCount
+		allStoreData.AllStoreTotalOrderAmount += store.TotalOrderAmount
+	}
+
+	storeMux.RUnlock()
+
+	if err := json.NewEncoder(w).Encode(allStoreData); err != nil {
+		http.Error(w, "Failed to encode snapshot", http.StatusInternalServerError)
+	}
+
+}
+
 func reactHandler(w http.ResponseWriter, r *http.Request) {
-	// Static file server for React build folder
 	currentDir, _ := os.Getwd()
 	buildPath := filepath.Join(currentDir, "frontend", "build")
 	fs := http.FileServer(http.Dir(buildPath))
@@ -189,24 +145,20 @@ func reactHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	// Kafka configuration
 	broker := "kafka:29092"
-	topic := "order_db.order_schema.order"
+	topic := "aggregated_store_orders"
 	groupID := "store-aggregation-group"
 
-	// Context for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Run Kafka consumer
 	go runKafkaConsumer(ctx, broker, topic, groupID)
 
-	// HTTP Handlers
 	http.HandleFunc("/snapshot", snapshotHandler)
 	http.HandleFunc("/events", sseHandler)
+	http.HandleFunc("/aggregates", allStoreHandler)
 	http.HandleFunc("/", reactHandler)
 
-	// Start HTTP server
 	log.Println("Starting HTTP server on :8081")
 	if err := http.ListenAndServe(":8081", nil); err != nil {
 		log.Fatalf("HTTP server error: %v", err)

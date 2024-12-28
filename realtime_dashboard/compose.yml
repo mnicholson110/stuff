@@ -124,9 +124,10 @@ services:
     container_name: mock-data
     restart: no
     environment:
-      INITIAL_ORDER_COUNT_K: 50
-      ORDER_UPDATE_COUNT_K: 5
-      NEW_ORDER_COUNT_K: 5
+      INITIAL_ORDER_COUNT_K: 100
+      ORDER_UPDATE_COUNT_K: 20
+      NEW_ORDER_COUNT_K: 10
+      STORE_COUNT: 1000
       HOST: postgres
       PORT: 5432
       USER: postgres
@@ -165,3 +166,14 @@ services:
       - debezium-init
       - mock-data
     restart: on-failure
+
+  streams-app:
+    container_name: streams-app
+    build: 
+      context: ./streams_app
+      dockerfile: Dockerfile
+    depends_on:
+      - kafka
+      - debezium
+      - debezium-init
+      - mock-data
