@@ -128,7 +128,13 @@ function App() {
 
         const features = Object.values(storeMap)
             .map((store) => {
-                if (!store.lat || !store.lng) return null;
+                if (
+                    !store.lat ||
+                    !store.lng ||
+                    !store.total_order_amount ||
+                    !store.order_count
+                )
+                    return null;
                 return {
                     type: "Feature",
                     geometry: {

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
@@ -12,13 +13,17 @@ import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.Serializer;
+import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.KafkaStreams;
+import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.Grouped;
 import org.apache.kafka.streams.kstream.Materialized;
 import org.apache.kafka.streams.kstream.Produced;
+import org.apache.kafka.streams.kstream.TimeWindows;
+import org.apache.kafka.streams.state.WindowStore;
 
 public class StoreAggregationApp
 {
@@ -89,24 +94,25 @@ public class StoreAggregationApp
                     return null;
                 }
             }, Grouped.with(Serdes.String(), Serdes.String()))
-            .aggregate(() -> new StoreAggregatedData(null, 0, 0.0, 0.0, 0.0), (key, value, aggregate) -> {
-                try
-                {
-                    OrderData orderData = mapper.readValue(value, OrderData.class);
-                    return new StoreAggregatedData(
-                        orderData.storeId,
-                        aggregate.order_count + 1,
-                        aggregate.total_order_amount + orderData.amount,
-                        orderData.lat,
-                        orderData.lng);
-                }
-                catch (IOException e)
-                {
-                    e.printStackTrace();
-                    return aggregate;
-                }
-            }, Materialized.with(Serdes.String(), serde))
+            .windowedBy(TimeWindows.ofSizeWithNoGrace(Duration.ofSeconds(10)))
+            .aggregate(() -> { return new StoreAggregatedData(null, 0, 0.0, 0.0, 0.0); }, (key, value, aggregate) -> {
+                    try
+                    {
+                        OrderData orderData = mapper.readValue(value, OrderData.class);
+                        return new StoreAggregatedData(
+                            orderData.storeId,
+                            aggregate.order_count + 1,
+                            aggregate.total_order_amount + orderData.amount,
+                            orderData.lat,
+                            orderData.lng);
+                    }
+                    catch (IOException e)
+                    {
+                        e.printStackTrace();
+                        return aggregate;
+                    } }, Materialized.<String, StoreAggregatedData, WindowStore<Bytes, byte[]>>as("store-aggregate-window-store").withKeySerde(Serdes.String()).withValueSerde(serde))
             .toStream()
+            .map((windowedKey, aggregatedValue) -> KeyValue.pair(windowedKey.key(), aggregatedValue))
             .to("aggregated_store_orders", Produced.with(Serdes.String(), serde));
 
         KafkaStreams streams = new KafkaStreams(builder.build(), props);

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
@@ -19,6 +20,7 @@ type AggregatedStoreData struct {
 	TotalOrderAmount float32 `json:"total_order_amount"`
 	Lat              float32 `json:"lat"`
 	Lng              float32 `json:"lng"`
+	Received         int64
 }
 
 type AggregatedAllStoreData struct {
@@ -65,6 +67,7 @@ func runKafkaConsumer(ctx context.Context, broker string, topic string, groupID 
 				continue
 			}
 
+			message.Received = time.Now().UnixMilli()
 			storeID := message.StoreId
 			storeMux.Lock()
 			storeData[storeID] = message
@@ -144,6 +147,28 @@ func reactHandler(w http.ResponseWriter, r *http.Request) {
 	wrappedHandler.ServeHTTP(w, r)
 }
 
+func staleDataCheck() {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			storeMux.Lock()
+			for storeId, data := range storeData {
+				if time.Now().UnixMilli()-data.Received > 10000 {
+					data.OrderCount = 0
+					data.TotalOrderAmount = 0
+					msg, _ := json.Marshal(data)
+					broadcast <- msg
+					delete(storeData, storeId)
+				}
+			}
+			storeMux.Unlock()
+		}
+	}
+}
+
 func main() {
 	broker := "kafka:29092"
 	topic := "aggregated_store_orders"
@@ -153,6 +178,8 @@ func main() {
 	defer cancel()
 
 	go runKafkaConsumer(ctx, broker, topic, groupID)
+
+	go staleDataCheck()
 
 	http.HandleFunc("/snapshot", snapshotHandler)
 	http.HandleFunc("/events", sseHandler)
