@@ -1,5 +1,6 @@
-node_modules/
-target/
-build/
-bin/
-.idea/
+node_modules
+target
+build
+bin
+.idea
+.settings
