@@ -95,22 +95,23 @@ public class StoreAggregationApp
                 }
             }, Grouped.with(Serdes.String(), Serdes.String()))
             .windowedBy(TimeWindows.ofSizeWithNoGrace(Duration.ofSeconds(10)))
-            .aggregate(() -> { return new StoreAggregatedData(null, 0, 0.0, 0.0, 0.0); }, (key, value, aggregate) -> {
-                    try
-                    {
-                        OrderData orderData = mapper.readValue(value, OrderData.class);
-                        return new StoreAggregatedData(
-                            orderData.storeId,
-                            aggregate.order_count + 1,
-                            aggregate.total_order_amount + orderData.amount,
-                            orderData.lat,
-                            orderData.lng);
-                    }
-                    catch (IOException e)
-                    {
-                        e.printStackTrace();
-                        return aggregate;
-                    } }, Materialized.<String, StoreAggregatedData, WindowStore<Bytes, byte[]>>as("store-aggregate-window-store").withKeySerde(Serdes.String()).withValueSerde(serde))
+            .aggregate(StoreAggregatedData::new, (key, value, aggregate) -> {
+                try
+                {
+                    OrderData orderData = mapper.readValue(value, OrderData.class);
+                    return new StoreAggregatedData(
+                        orderData.storeId,
+                        aggregate.order_count + 1,
+                        aggregate.total_order_amount + orderData.amount,
+                        orderData.lat,
+                        orderData.lng);
+                }
+                catch (IOException e)
+                {
+                    e.printStackTrace();
+                    return aggregate;
+                }
+            }, Materialized.<String, StoreAggregatedData, WindowStore<Bytes, byte[]>>as("store-aggregate-window-store").withKeySerde(Serdes.String()).withValueSerde(serde))
             .toStream()
             .map((windowedKey, aggregatedValue) -> KeyValue.pair(windowedKey.key(), aggregatedValue))
             .to("aggregated_store_orders", Produced.with(Serdes.String(), serde));

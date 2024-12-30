@@ -19,6 +19,13 @@
   </properties>
   <!-- Dependencies -->
   <dependencies>
+    <!-- Flink dependencies -->
+    <dependency>
+      <groupId>org.apache.flink</groupId>
+      <artifactId>flink-java</artifactId>
+      <version>1.17.0</version> <!-- or your desired version -->
+    </dependency>
+
     <!-- Kafka Streams -->
     <dependency>
       <groupId>org.apache.kafka</groupId>

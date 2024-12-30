@@ -186,8 +186,7 @@ func main() {
 	http.HandleFunc("/aggregates", allStoreHandler)
 	http.HandleFunc("/", reactHandler)
 
-	log.Println("Starting HTTP server on :8081")
-	if err := http.ListenAndServe(":8081", nil); err != nil {
+	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatalf("HTTP server error: %v", err)
 	}
 }
