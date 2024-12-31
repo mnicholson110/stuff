@@ -36,9 +36,9 @@ services:
       - ./postgres:/docker-entrypoint-initdb.d
     healthcheck:
       test: ['CMD', 'pg_isready', '-U', 'postgres']
-      start_period: 10s
-      interval: 10s
-      timeout: 5s
+      start_period: 5s
+      interval: 5s
+      timeout: 3s
       retries: 3
 
   debezium:
@@ -69,9 +69,9 @@ services:
           'GET',
           'http://localhost:8083/connectors'
         ]
-      start_period: 10s
-      interval: 10s
-      timeout: 5s 
+      start_period: 0s
+      interval: 2s
+      timeout: 3s 
       retries: 3
 
   debezium-init:
@@ -188,9 +188,7 @@ services:
       dockerfile: Dockerfile
     depends_on:
       - kafka
-      - debezium
       - debezium-init
-      - mock-data
       - redpanda-console
     environment:
       - |
