@@ -192,10 +192,14 @@ services:
       - debezium-init
       - redpanda-console
     environment:
-      - |
-        FLINK_PROPERTIES=
+      KAFKA_SOURCE_ADDR: 'kafka:29092'
+      KAFKA_SINK_ADDR: 'kafka:29092'
+      KAFKA_CONS_GROUP_ID: 'flink-group-id'
+      INPUT_TOPIC: 'order_db.order_schema.order'
+      OUTPUT_TOPIC: 'aggregated_store_orders'
+      FLINK_PROPERTIES: |-
         jobmanager.rpc.address: jobmanager
-        parallelism.default: 3        
+        parallelism.default: 3
 
   flink-taskmanager:
     image: flink:1.20
@@ -205,8 +209,7 @@ services:
     depends_on:
       - flink-jobmanager
     environment:
-      - |
-        FLINK_PROPERTIES=
+      FLINK_PROPERTIES: |-
         jobmanager.rpc.address: jobmanager
         taskmanager.numberOfTaskSlots: 3
-        parallelism.default: 3        
+        parallelism.default: 3

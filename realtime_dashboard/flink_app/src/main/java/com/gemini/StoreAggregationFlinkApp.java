@@ -20,21 +20,27 @@ public class StoreAggregationFlinkApp
 {
     public static void main(String[] args) throws Exception
     {
+        final String kafkaSourceAddr = System.getenv("KAFKA_SOURCE_ADDR");
+        final String kafkaSinkAddr = System.getenv("KAFKA_SINK_ADDR");
+        final String consumerGroupId = System.getenv("KAFKA_CONS_GROUP_ID");
+        final String inputTopic = System.getenv("INPUT_TOPIC");
+        final String outputTopic = System.getenv("OUTPUT_TOPIC");
+
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(3);
 
         KafkaSource<OrderData> source = KafkaSource.<OrderData>builder()
-                                            .setBootstrapServers("kafka:29092")
-                                            .setTopics("order_db.order_schema.order")
-                                            .setGroupId("flink-app-group")
+                                            .setBootstrapServers(kafkaSourceAddr)
+                                            .setTopics(inputTopic)
+                                            .setGroupId(consumerGroupId)
                                             .setStartingOffsets(OffsetsInitializer.latest())
                                             .setValueOnlyDeserializer(new OrderDataDeserializationSchema())
                                             .build();
 
         KafkaSink<StoreAggregatedData> sink = KafkaSink.<StoreAggregatedData>builder()
-                                                  .setBootstrapServers("kafka:29092")
+                                                  .setBootstrapServers(kafkaSinkAddr)
                                                   .setRecordSerializer(KafkaRecordSerializationSchema.builder()
-                                                                           .setTopic("aggregated_store_orders_flink")
+                                                                           .setTopic(outputTopic)
                                                                            .setKeySerializationSchema(StoreAggregatedData::serializeKey)
                                                                            .setValueSerializationSchema(StoreAggregatedData::serializeValue)
                                                                            .build())
