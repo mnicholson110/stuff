@@ -167,15 +167,16 @@ services:
       - mock-data
     restart: on-failure
 
-  #streams-app:
-    #  container_name: streams-app
-    #build: 
-    #  context: ./streams_app
-    #  dockerfile: Dockerfile
-    #depends_on:
-    #  - kafka
-    #  - debezium
-    #  - mock-data
+  streams-app:
+    container_name: streams-app
+    hostname: streams
+    build: 
+      context: ./streams_app
+      dockerfile: Dockerfile
+    depends_on:
+      - kafka
+      - debezium
+      - mock-data
 
   flink-jobmanager:
     container_name: flink-jobmanager

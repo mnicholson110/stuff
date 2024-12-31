@@ -4,8 +4,8 @@ import java.io.IOException;
 import java.time.Duration;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.AggregateFunction;
-import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.serialization.DeserializationSchema;
+import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.connector.base.DeliveryGuarantee;
 import org.apache.flink.connector.kafka.sink.KafkaRecordSerializationSchema;
@@ -19,12 +19,8 @@ import org.apache.flink.streaming.api.windowing.assigners.SlidingProcessingTimeW
 
 public class StoreAggregationFlinkApp
 {
-
-    private static final ObjectMapper mapper = new ObjectMapper();
-
     public static void main(String[] args) throws Exception
     {
-
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(3);
 
@@ -39,27 +35,15 @@ public class StoreAggregationFlinkApp
         KafkaSink<StoreAggregatedData> sink = KafkaSink.<StoreAggregatedData>builder()
                                                   .setBootstrapServers("kafka:29092")
                                                   .setRecordSerializer(KafkaRecordSerializationSchema.builder()
-                                                                           .setTopic("aggregated_store_orders")
-                                                                           .setKeySerializationSchema(
-                                                                               (StoreAggregatedData s) -> s.store_id.getBytes())
-                                                                           .setValueSerializationSchema(
-                                                                               (StoreAggregatedData s) -> {
-                                                                                   try
-                                                                                   {
-                                                                                       return mapper.writeValueAsString(s).getBytes();
-                                                                                   }
-                                                                                   catch (IOException e)
-                                                                                   {
-                                                                                       e.printStackTrace();
-                                                                                       return new byte[0];
-                                                                                   }
-                                                                               })
+                                                                           .setTopic("aggregated_store_orders_flink")
+                                                                           .setKeySerializationSchema(StoreAggregatedData::serializeKey)
+                                                                           .setValueSerializationSchema(new StoreAggregatedDataSerializationSchema())
                                                                            .build())
                                                   .setDeliveryGuarantee(DeliveryGuarantee.NONE)
                                                   .build();
 
         env.fromSource(source, WatermarkStrategy.noWatermarks(), "Kafka input")
-            .filter((FilterFunction<OrderData>)(order) -> "Delivered".equals(order.orderStatus))
+            .filter((order) -> "Delivered".equals(order.orderStatus))
             .keyBy((order) -> order.storeId)
             .window(SlidingProcessingTimeWindows.of(Duration.ofSeconds(10), Duration.ofSeconds(1)))
             .aggregate(new StoreAggregateFunction())
@@ -92,19 +76,28 @@ public class StoreAggregationFlinkApp
 
     public static class OrderDataDeserializationSchema implements DeserializationSchema<OrderData>
     {
+        public final ObjectMapper mapper = new ObjectMapper();
         @Override
-        public OrderData deserialize(byte[] message) throws IOException
+        public OrderData deserialize(byte[] message)
         {
-            JsonNode rootNode = mapper.readTree(message);
-            JsonNode dataNode = mapper.readTree(rootNode.get("data").asText());
-            JsonNode orderNode = dataNode.get("order");
-            JsonNode storeNode = dataNode.get("store");
-            return new OrderData(
-                orderNode.get("order_amount").asDouble(),
-                storeNode.get("store_id").asText(),
-                storeNode.at("/store_loc/store_lat").asDouble(),
-                storeNode.at("/store_loc/store_long").asDouble(),
-                orderNode.get("order_status").asText());
+            try
+            {
+                JsonNode rootNode = mapper.readTree(message);
+                JsonNode dataNode = mapper.readTree(rootNode.get("data").asText());
+                JsonNode orderNode = dataNode.get("order");
+                JsonNode storeNode = dataNode.get("store");
+                return new OrderData(
+                    orderNode.get("order_amount").asDouble(),
+                    storeNode.get("store_id").asText(),
+                    storeNode.at("/store_loc/store_lat").asDouble(),
+                    storeNode.at("/store_loc/store_long").asDouble(),
+                    orderNode.get("order_status").asText());
+            }
+            catch (IOException e)
+            {
+                e.printStackTrace();
+                return new OrderData(0.0, null, 0.0, 0.0, null);
+            }
         }
 
         @Override
@@ -128,12 +121,18 @@ public class StoreAggregationFlinkApp
         public double lat;
         public double lng;
 
+        public final ObjectMapper mapper = new ObjectMapper();
+
         public StoreAggregatedData()
         {
         }
 
-        public StoreAggregatedData(String store_id, int order_count, double total_order_amount,
-                                   double lat, double lng)
+        public byte[] serializeKey()
+        {
+            return store_id.getBytes();
+        }
+
+        public StoreAggregatedData(String store_id, int order_count, double total_order_amount, double lat, double lng)
         {
             this.store_id = store_id;
             this.order_count = order_count;
@@ -143,8 +142,25 @@ public class StoreAggregationFlinkApp
         }
     }
 
-    public static class StoreAggregateFunction
-        implements AggregateFunction<OrderData, StoreAggregatedData, StoreAggregatedData>
+    public static class StoreAggregatedDataSerializationSchema implements SerializationSchema<StoreAggregatedData>
+    {
+        final ObjectMapper mapper = new ObjectMapper();
+
+        @Override
+        public byte[] serialize(StoreAggregatedData data) {
+            try
+            {
+                return mapper.writeValueAsString(data).getBytes();
+            }
+            catch (IOException e)
+            {
+                e.printStackTrace();
+                return new byte[0];
+            }
+        }
+    }
+
+    public static class StoreAggregateFunction implements AggregateFunction<OrderData, StoreAggregatedData, StoreAggregatedData>
     {
         @Override
         public StoreAggregatedData createAccumulator()

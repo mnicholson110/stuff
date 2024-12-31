@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Console Appender -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <!-- Pattern Layout -->
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} %-5level [%thread] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Root Logger -->
+    <root level="INFO">
+        <appender-ref ref="STDOUT" />
+    </root>
+
+    <!-- Logger for Your Application -->
+    <logger name="com.gemini" level="DEBUG" additivity="false">
+        <appender-ref ref="STDOUT" />
+    </logger>
+
+    <!-- Adjust Kafka's Logging Level if Necessary -->
+    <logger name="org.apache.kafka" level="WARN"/>
+</configuration>
