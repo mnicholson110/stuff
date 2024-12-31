@@ -12,7 +12,7 @@ RUN npm run build
 FROM debian:bookworm-slim
 WORKDIR /app
 COPY --from=builder /app/app .
-COPY --from=react-builder /frontend/build ./frontend/build
+COPY --from=react-builder /frontend/dist ./frontend/dist
 EXPOSE 8081
 
 CMD ["./app"]

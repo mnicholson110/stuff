@@ -82,6 +82,7 @@ public class StoreAggregationFlinkApp
     public static class OrderDataDeserializationSchema implements DeserializationSchema<OrderData>
     {
         public static final ObjectMapper mapper = new ObjectMapper();
+
         @Override
         public OrderData deserialize(byte[] message)
         {
@@ -101,7 +102,7 @@ public class StoreAggregationFlinkApp
             catch (IOException e)
             {
                 e.printStackTrace();
-                return new OrderData(0.0, null, 0.0, 0.0, null);
+                return new OrderData();
             }
         }
 

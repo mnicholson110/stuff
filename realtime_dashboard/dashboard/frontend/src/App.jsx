@@ -2,13 +2,12 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import "./App.css";
 
 import maplibregl from "maplibre-gl";
-import React, {useEffect, useRef, useState} from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 const DARK_MAP_STYLE =
     "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 
-function App()
-{
+export default function App() {
     const mapContainerRef = useRef(null);
     const mapRef = useRef(null);
 
@@ -19,13 +18,12 @@ function App()
     const [showOverlay, setShowOverlay] = useState(true);
 
     useEffect(() => {
-        if (mapRef.current)
-            return;
+        if (mapRef.current) return;
         mapRef.current = new maplibregl.Map({
-            container : mapContainerRef.current,
-            style : DARK_MAP_STYLE,
-            center : [ -98.5795, 39.8283 ],
-            zoom : 4,
+            container: mapContainerRef.current,
+            style: DARK_MAP_STYLE,
+            center: [-98.5795, 39.8283],
+            zoom: 4,
         });
 
         mapRef.current.addControl(
@@ -35,29 +33,29 @@ function App()
 
         mapRef.current.on("load", () => {
             mapRef.current.addSource("stores", {
-                type : "geojson",
-                data : {
-                    type : "FeatureCollection",
-                    features : [],
+                type: "geojson",
+                data: {
+                    type: "FeatureCollection",
+                    features: [],
                 },
             });
 
             mapRef.current.addLayer({
-                id : "stores-layer",
-                type : "circle",
-                source : "stores",
-                paint : {
-                    "circle-radius" : 5,
-                    "circle-color" : "blue",
-                    "circle-stroke-width" : 1,
-                    "circle-stroke-color" : "#fff",
+                id: "stores-layer",
+                type: "circle",
+                source: "stores",
+                paint: {
+                    "circle-radius": 5,
+                    "circle-color": "blue",
+                    "circle-stroke-width": 1,
+                    "circle-stroke-color": "#fff",
                 },
             });
 
             // popup on click
             mapRef.current.on("click", "stores-layer", (e) => {
                 const feature = e.features[0];
-                const {store_id, order_count, total_order_amount} =
+                const { store_id, order_count, total_order_amount } =
                     feature.properties;
                 new maplibregl.Popup()
                     .setLngLat(e.lngLat)
@@ -69,7 +67,7 @@ function App()
               <strong>Amount:</strong> $${total_order_amount}
             </div>
           `,
-                        )
+                    )
                     .addTo(mapRef.current);
             });
 
@@ -79,9 +77,8 @@ function App()
                 .then((data) => {
                     setStoreMap(data);
                 })
-                .catch(
-                    (err) =>
-                        console.error("Failed to fetch snapshot:", err),
+                .catch((err) =>
+                    console.error("Failed to fetch snapshot:", err),
                 );
         });
     }, []);
@@ -92,28 +89,22 @@ function App()
         let updateQueue = [];
 
         es.onmessage = (event) => {
-            if (!mapLoaded)
-                return;
-            try
-            {
+            if (!mapLoaded) return;
+            try {
                 const updatedStore = JSON.parse(event.data);
                 updateQueue.push(updatedStore);
-            }
-            catch (err)
-            {
+            } catch (err) {
                 console.error("SSE parse error:", err, event.data);
             }
         };
 
         // every 200ms, flush the queue in one go
         const flushInterval = setInterval(() => {
-            if (updateQueue.length > 0)
-            {
+            if (updateQueue.length > 0) {
                 setStoreMap((prevMap) => {
-                    const newMap = {...prevMap};
+                    const newMap = { ...prevMap };
 
-                    for (const store of updateQueue)
-                    {
+                    for (const store of updateQueue) {
                         newMap[store.store_id] = store;
                     }
                     updateQueue = [];
@@ -130,38 +121,37 @@ function App()
     }, []);
 
     useEffect(() => {
-        if (!mapRef.current)
-            return;
+        if (!mapRef.current) return;
 
         const src = mapRef.current.getSource("stores");
-        if (!src)
-            return;
+        if (!src) return;
 
         const features = Object.values(storeMap)
-                             .map((store) => {
-                                 if (
-                                     !store.lat ||
-                                     !store.lng ||
-                                     !store.total_order_amount ||
-                                     !store.order_count)
-                                     return null;
-                                 return {
-                                     type : "Feature",
-                                     geometry : {
-                                         type : "Point",
-                                         coordinates : [ store.lng, store.lat ],
-                                     },
-                                     properties : {
-                                         store_id : store.store_id,
-                                         order_count : store.order_count,
-                                         total_order_amount : store.total_order_amount,
-                                     },
-                                 };
-                             })
-                             .filter(Boolean);
+            .map((store) => {
+                if (
+                    !store.lat ||
+                    !store.lng ||
+                    !store.total_order_amount ||
+                    !store.order_count
+                )
+                    return null;
+                return {
+                    type: "Feature",
+                    geometry: {
+                        type: "Point",
+                        coordinates: [store.lng, store.lat],
+                    },
+                    properties: {
+                        store_id: store.store_id,
+                        order_count: store.order_count,
+                        total_order_amount: store.total_order_amount,
+                    },
+                };
+            })
+            .filter(Boolean);
 
         src.setData({
-            type : "FeatureCollection",
+            type: "FeatureCollection",
             features,
         });
 
@@ -172,12 +162,11 @@ function App()
                 setTotalAmount(data.all_store_total_order_amount);
             })
             .catch((err) => console.error("Failed to fetch aggregates:", err));
-    }, [ storeMap ]);
+    }, [storeMap]);
 
     return (
         <>
-            <div className="map-container" ref={
-        mapContainerRef} />
+            <div className="map-container" ref={mapContainerRef} />
 
             {showOverlay && (
                 <div className="data-overlay">
@@ -191,25 +180,23 @@ function App()
                         {totalAmount.toLocaleString()}
                     </p>
                     <button
-    className = "toggle-btn"
+                        className="toggle-btn"
                         onClick={() => setShowOverlay(false)}
                     >
                         Hide Data
                     </button>
                 </div>
-            )
-}
+            )}
 
             {!showOverlay && (
                 <div
-            className = "data-overlay"
-            style = {
-                {
-                    backgroundColor: "rgba(0,0,0,0.4)",
-                }
-            } >
-                    < button
-            className = "toggle-btn"
+                    className="data-overlay"
+                    style={{
+                        backgroundColor: "rgba(0,0,0,0.4)",
+                    }}
+                >
+                    <button
+                        className="toggle-btn"
                         onClick={() => setShowOverlay(true)}
                     >
                         Show Data
@@ -219,5 +206,3 @@ function App()
         </>
     );
 }
-
-export default App;

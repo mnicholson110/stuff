@@ -141,7 +141,7 @@ func allStoreHandler(w http.ResponseWriter, r *http.Request) {
 
 func reactHandler(w http.ResponseWriter, r *http.Request) {
 	currentDir, _ := os.Getwd()
-	buildPath := filepath.Join(currentDir, "frontend", "build")
+	buildPath := filepath.Join(currentDir, "frontend", "dist")
 	fs := http.FileServer(http.Dir(buildPath))
 	wrappedHandler := http.StripPrefix("/", fs)
 	wrappedHandler.ServeHTTP(w, r)
