@@ -15,7 +15,7 @@ import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsIni
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.windowing.assigners.TumblingProcessingTimeWindows;
+import org.apache.flink.streaming.api.windowing.assigners.SlidingProcessingTimeWindows;
 
 public class StoreAggregationFlinkApp
 {
@@ -26,12 +26,13 @@ public class StoreAggregationFlinkApp
     {
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(3);
 
         KafkaSource<OrderData> source = KafkaSource.<OrderData>builder()
                                             .setBootstrapServers("kafka:29092")
                                             .setTopics("order_db.order_schema.order")
                                             .setGroupId("flink-app-group")
-                                            .setStartingOffsets(OffsetsInitializer.earliest())
+                                            .setStartingOffsets(OffsetsInitializer.latest())
                                             .setValueOnlyDeserializer(new OrderDataDeserializationSchema())
                                             .build();
 
@@ -54,13 +55,13 @@ public class StoreAggregationFlinkApp
                                                                                    }
                                                                                })
                                                                            .build())
-                                                  .setDeliveryGuarantee(DeliveryGuarantee.AT_LEAST_ONCE)
+                                                  .setDeliveryGuarantee(DeliveryGuarantee.NONE)
                                                   .build();
 
         env.fromSource(source, WatermarkStrategy.noWatermarks(), "Kafka input")
             .filter((FilterFunction<OrderData>)(order) -> "Delivered".equals(order.orderStatus))
             .keyBy((order) -> order.storeId)
-            .window(TumblingProcessingTimeWindows.of(Duration.ofSeconds(10)))
+            .window(SlidingProcessingTimeWindows.of(Duration.ofSeconds(10), Duration.ofSeconds(1)))
             .aggregate(new StoreAggregateFunction())
             .sinkTo(sink);
 
