@@ -5,7 +5,6 @@ import java.time.Duration;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.AggregateFunction;
 import org.apache.flink.api.common.serialization.DeserializationSchema;
-import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.connector.base.DeliveryGuarantee;
 import org.apache.flink.connector.kafka.sink.KafkaRecordSerializationSchema;
@@ -37,7 +36,7 @@ public class StoreAggregationFlinkApp
                                                   .setRecordSerializer(KafkaRecordSerializationSchema.builder()
                                                                            .setTopic("aggregated_store_orders_flink")
                                                                            .setKeySerializationSchema(StoreAggregatedData::serializeKey)
-                                                                           .setValueSerializationSchema(new StoreAggregatedDataSerializationSchema())
+                                                                           .setValueSerializationSchema(StoreAggregatedData::serializeValue)
                                                                            .build())
                                                   .setDeliveryGuarantee(DeliveryGuarantee.NONE)
                                                   .build();
@@ -76,7 +75,7 @@ public class StoreAggregationFlinkApp
 
     public static class OrderDataDeserializationSchema implements DeserializationSchema<OrderData>
     {
-        public final ObjectMapper mapper = new ObjectMapper();
+        public static final ObjectMapper mapper = new ObjectMapper();
         @Override
         public OrderData deserialize(byte[] message)
         {
@@ -121,10 +120,23 @@ public class StoreAggregationFlinkApp
         public double lat;
         public double lng;
 
-        public final ObjectMapper mapper = new ObjectMapper();
+        public static final ObjectMapper mapper = new ObjectMapper();
 
         public StoreAggregatedData()
         {
+        }
+
+        public byte[] serializeValue()
+        {
+            try
+            {
+                return mapper.writeValueAsString(this).getBytes();
+            }
+            catch (Throwable e)
+            {
+                e.printStackTrace();
+                return new byte[0];
+            }
         }
 
         public byte[] serializeKey()
@@ -142,26 +154,12 @@ public class StoreAggregationFlinkApp
         }
     }
 
-    public static class StoreAggregatedDataSerializationSchema implements SerializationSchema<StoreAggregatedData>
-    {
-        final ObjectMapper mapper = new ObjectMapper();
-
-        @Override
-        public byte[] serialize(StoreAggregatedData data) {
-            try
-            {
-                return mapper.writeValueAsString(data).getBytes();
-            }
-            catch (IOException e)
-            {
-                e.printStackTrace();
-                return new byte[0];
-            }
-        }
-    }
-
     public static class StoreAggregateFunction implements AggregateFunction<OrderData, StoreAggregatedData, StoreAggregatedData>
     {
+        public StoreAggregateFunction()
+        {
+        }
+
         @Override
         public StoreAggregatedData createAccumulator()
         {
