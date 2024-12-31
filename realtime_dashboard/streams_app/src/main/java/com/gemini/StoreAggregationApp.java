@@ -29,7 +29,7 @@ public class StoreAggregationApp
     public static void main(String[] args)
     {
         Properties props = new Properties();
-        props.put(StreamsConfig.APPLICATION_ID_CONFIG, "store-aggregation-app");
+        props.put(StreamsConfig.APPLICATION_ID_CONFIG, "store-aggregation-app"); 
         props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "kafka:29092");
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         props.put(StreamsConfig.NUM_STREAM_THREADS_CONFIG, 3);

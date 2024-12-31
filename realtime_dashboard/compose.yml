@@ -167,16 +167,16 @@ services:
       - mock-data
     restart: on-failure
 
-  streams-app:
-    container_name: streams-app
-    hostname: streams
-    build: 
-      context: ./streams_app
-      dockerfile: Dockerfile
-    depends_on:
-      - kafka
-      - debezium
-      - mock-data
+  #  streams-app:
+  #    container_name: streams-app
+  #    hostname: streams
+  #    build: 
+  #      context: ./streams_app
+  #      dockerfile: Dockerfile
+  #    depends_on:
+  #      - kafka
+  #      - debezium
+  #      - mock-data
 
   flink-jobmanager:
     container_name: flink-jobmanager
@@ -198,10 +198,8 @@ services:
         parallelism.default: 3        
 
   flink-taskmanager:
+    image: flink:1.20
     container_name: flink-taskmanager
-    build: 
-      context: ./flink_app
-      dockerfile: Dockerfile
     command: taskmanager
     scale: 1
     depends_on:
@@ -210,5 +208,5 @@ services:
       - |
         FLINK_PROPERTIES=
         jobmanager.rpc.address: jobmanager
-        taskmanager.numberOfTaskSlots: 6
+        taskmanager.numberOfTaskSlots: 3
         parallelism.default: 3        
