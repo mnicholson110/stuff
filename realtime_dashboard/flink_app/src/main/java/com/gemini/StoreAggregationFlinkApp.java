@@ -1,22 +1,19 @@
 package com.gemini;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.time.Duration;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.AggregateFunction;
 import org.apache.flink.api.common.functions.FilterFunction;
-import org.apache.flink.api.common.functions.FlatMapFunction;
-import org.apache.flink.api.common.serialization.SimpleStringSchema;
-import org.apache.flink.configuration.ConfigConstants;
-import org.apache.flink.configuration.Configuration;
+import org.apache.flink.api.common.serialization.DeserializationSchema;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.connector.base.DeliveryGuarantee;
 import org.apache.flink.connector.kafka.sink.KafkaRecordSerializationSchema;
 import org.apache.flink.connector.kafka.sink.KafkaSink;
 import org.apache.flink.connector.kafka.source.KafkaSource;
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingProcessingTimeWindows;
 
@@ -30,66 +27,41 @@ public class StoreAggregationFlinkApp
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
-        KafkaSource<String> source = KafkaSource.<String>builder()
-                                         .setBootstrapServers("kafka:29092")
-                                         .setTopics("order_db.order_schema.order")
-                                         .setGroupId("flink-app-group")
-                                         .setStartingOffsets(OffsetsInitializer.earliest())
-                                         .setValueOnlyDeserializer(new SimpleStringSchema())
-                                         .build();
+        KafkaSource<OrderData> source = KafkaSource.<OrderData>builder()
+                                            .setBootstrapServers("kafka:29092")
+                                            .setTopics("order_db.order_schema.order")
+                                            .setGroupId("flink-app-group")
+                                            .setStartingOffsets(OffsetsInitializer.earliest())
+                                            .setValueOnlyDeserializer(new OrderDataDeserializationSchema())
+                                            .build();
 
-        KafkaSink<String> sink = KafkaSink.<String>builder()
-                                     .setBootstrapServers("kafka:29092")
-                                     .setRecordSerializer(KafkaRecordSerializationSchema.builder()
-                                                              .setTopic("flink-out-topic")
-                                                              .setValueSerializationSchema(new SimpleStringSchema())
-                                                              .build())
-                                     .setDeliveryGuarantee(DeliveryGuarantee.AT_LEAST_ONCE)
-                                     .build();
+        KafkaSink<StoreAggregatedData> sink = KafkaSink.<StoreAggregatedData>builder()
+                                                  .setBootstrapServers("kafka:29092")
+                                                  .setRecordSerializer(KafkaRecordSerializationSchema.builder()
+                                                                           .setTopic("aggregated_store_orders")
+                                                                           .setKeySerializationSchema(
+                                                                               (StoreAggregatedData s) -> s.store_id.getBytes())
+                                                                           .setValueSerializationSchema(
+                                                                               (StoreAggregatedData s) -> {
+                                                                                   try
+                                                                                   {
+                                                                                       return mapper.writeValueAsString(s).getBytes();
+                                                                                   }
+                                                                                   catch (IOException e)
+                                                                                   {
+                                                                                       e.printStackTrace();
+                                                                                       return new byte[0];
+                                                                                   }
+                                                                               })
+                                                                           .build())
+                                                  .setDeliveryGuarantee(DeliveryGuarantee.AT_LEAST_ONCE)
+                                                  .build();
 
         env.fromSource(source, WatermarkStrategy.noWatermarks(), "Kafka input")
-            .filter((FilterFunction<String>)(value) -> {
-                try
-                {
-                    JsonNode rootNode = mapper.readTree(value);
-                    JsonNode dataNode = mapper.readTree(rootNode.get("data").asText());
-                    String status = dataNode.at("/order/order_status").asText();
-                    return "Delivered".equals(status);
-                }
-                catch (IOException e)
-                {
-                    e.printStackTrace();
-                    return false;
-                }
-            })
-            .flatMap((FlatMapFunction<String, OrderData>)(value, out) -> {
-                try
-                {
-                    JsonNode rootNode = mapper.readTree(value);
-                    JsonNode dataNode = mapper.readTree(rootNode.get("data").asText());
-                    JsonNode orderNode = dataNode.get("order");
-                    JsonNode storeNode = dataNode.get("store");
-                    if (orderNode != null && storeNode != null)
-                    {
-                        OrderData orderData = new OrderData(
-                            orderNode.get("order_amount").asDouble(),
-                            storeNode.get("store_id").asText(),
-                            storeNode.at("/store_loc/store_lat").asDouble(),
-                            storeNode.at("/store_loc/store_long").asDouble());
-                        out.collect(orderData);
-                    }
-                }
-                catch (IOException e)
-                {
-                    e.printStackTrace();
-                }
-            })
-            // required due to java type erasure
-            .returns(OrderData.class)
-            .keyBy(order -> order.storeId)
-            .windowAll(TumblingProcessingTimeWindows.of(Duration.ofSeconds(10)))
+            .filter((FilterFunction<OrderData>)(order) -> "Delivered".equals(order.orderStatus))
+            .keyBy((order) -> order.storeId)
+            .window(TumblingProcessingTimeWindows.of(Duration.ofSeconds(10)))
             .aggregate(new StoreAggregateFunction())
-            .map(mapper::writeValueAsString)
             .sinkTo(sink);
 
         env.execute("Flink Store Aggregation Job");
@@ -97,39 +69,62 @@ public class StoreAggregationFlinkApp
 
     public static class OrderData
     {
-        @JsonProperty
         public double amount;
-        @JsonProperty
         public String storeId;
-        @JsonProperty
         public double lat;
-        @JsonProperty
         public double lng;
+        public String orderStatus;
 
         public OrderData()
         {
         }
 
-        public OrderData(double amount, String storeId, double lat, double lng)
+        public OrderData(double amount, String storeId, double lat, double lng, String orderStatus)
         {
             this.amount = amount;
             this.storeId = storeId;
             this.lat = lat;
             this.lng = lng;
+            this.orderStatus = orderStatus;
+        }
+    }
+
+    public static class OrderDataDeserializationSchema implements DeserializationSchema<OrderData>
+    {
+        @Override
+        public OrderData deserialize(byte[] message) throws IOException
+        {
+            JsonNode rootNode = mapper.readTree(message);
+            JsonNode dataNode = mapper.readTree(rootNode.get("data").asText());
+            JsonNode orderNode = dataNode.get("order");
+            JsonNode storeNode = dataNode.get("store");
+            return new OrderData(
+                orderNode.get("order_amount").asDouble(),
+                storeNode.get("store_id").asText(),
+                storeNode.at("/store_loc/store_lat").asDouble(),
+                storeNode.at("/store_loc/store_long").asDouble(),
+                orderNode.get("order_status").asText());
+        }
+
+        @Override
+        public boolean isEndOfStream(OrderData o)
+        {
+            return false;
+        }
+
+        @Override
+        public TypeInformation<OrderData> getProducedType()
+        {
+            return TypeInformation.of(OrderData.class);
         }
     }
 
     public static class StoreAggregatedData
     {
-        @JsonProperty
         public String store_id;
-        @JsonProperty
         public int order_count;
-        @JsonProperty
         public double total_order_amount;
-        @JsonProperty
         public double lat;
-        @JsonProperty
         public double lng;
 
         public StoreAggregatedData()
