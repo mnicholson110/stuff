@@ -98,7 +98,6 @@ export default function App() {
             }
         };
 
-        // every 200ms, flush the queue in one go
         const flushInterval = setInterval(() => {
             if (updateQueue.length > 0) {
                 setStoreMap((prevMap) => {
@@ -112,7 +111,7 @@ export default function App() {
                     return newMap;
                 });
             }
-        }, 200);
+        }, 100);
 
         return () => {
             clearInterval(flushInterval);

@@ -92,12 +92,6 @@ func sseHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	clientChan := make(chan []byte)
-	go func() {
-		<-r.Context().Done()
-		close(clientChan)
-	}()
-
 	for {
 		select {
 		case msg := <-broadcast:
