@@ -16,6 +16,7 @@ import (
 
 type AggregatedStoreData struct {
 	StoreId       string  `json:"store_id"`
+	Count         int     `json:"count"`
 	AvgProcessing float32 `json:"avg_processing"`
 	AvgShipped    float32 `json:"avg_shipped"`
 	AvgDelivered  float32 `json:"avg_delivered"`
@@ -24,9 +25,11 @@ type AggregatedStoreData struct {
 	Received      int64
 }
 
-var storeData = make(map[string]AggregatedStoreData)
-var storeMux sync.RWMutex
-var broadcast = make(chan []byte)
+var (
+	storeData = make(map[string]AggregatedStoreData)
+	storeMux  sync.RWMutex
+	broadcast = make(chan []byte)
+)
 
 func runKafkaConsumer(ctx context.Context, broker string, topic string, groupID string) {
 	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{

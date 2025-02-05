@@ -8,10 +8,10 @@ const DARK_MAP_STYLE =
     "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 
 function formatDuration(ms) {
-    const minutes = ms / 60000;
-    const formattedMinutes = minutes.toFixed(2);
-    const unit = minutes === 1 ? "minute" : "minutes";
-    return `${formattedMinutes} ${unit}`;
+    const seconds = ms / 1000;
+    const formattedSeconds = seconds.toFixed(2);
+    const unit = seconds === 1 ? "seconds" : "seconds";
+    return `${formattedSeconds} ${unit}`;
 }
 
 export default function App() {
@@ -59,7 +59,7 @@ export default function App() {
             // popup on click
             mapRef.current.on("click", "stores-layer", (e) => {
                 const feature = e.features[0];
-                const { store_id, avg_processing, avg_delivered, avg_shipped } =
+                const { store_id, count, avg_processing, avg_delivered, avg_shipped } =
                     feature.properties;
                 new maplibregl.Popup()
                     .setLngLat(e.lngLat)
@@ -67,6 +67,7 @@ export default function App() {
                         `
             <div style="color: #333;">
               <strong>Store ID:</strong> ${store_id}<br/>
+              <strong>Order Count:</strong> ${count}<br/>
               <strong>Avg. Time to Processing: </strong> ${formatDuration(avg_processing)}<br/>
               <strong>Avg. Time to Shipped: </strong> ${formatDuration(avg_shipped)}<br/>
               <strong>Avg. Time to Delivered: </strong> ${formatDuration(avg_delivered)}<br/>
@@ -148,6 +149,7 @@ export default function App() {
                     },
                     properties: {
                         store_id: store.store_id,
+                        count: store.count,
                         avg_processing: store.avg_processing,
                         avg_delivered: store.avg_delivered,
                         avg_shipped: store.avg_shipped,

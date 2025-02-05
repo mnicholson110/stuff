@@ -127,6 +127,7 @@ public class StoreTimingFlinkApp
     public static class StoreAggregatedData
     {
         public String store_id;
+        public int count;
         public double avg_processing;
         public double avg_shipped;
         public double avg_delivered;
@@ -157,9 +158,10 @@ public class StoreTimingFlinkApp
             return store_id.getBytes();
         }
 
-        public StoreAggregatedData(String store_id, double avg_processing, double avg_shipped, double avg_delivered, double lat, double lng)
+        public StoreAggregatedData(String store_id, int count, double avg_processing, double avg_shipped, double avg_delivered, double lat, double lng)
         {
             this.store_id = store_id;
+            this.count = count;
             this.avg_processing = avg_processing;
             this.avg_shipped = avg_shipped;
             this.avg_delivered = avg_delivered;
@@ -224,7 +226,7 @@ public class StoreTimingFlinkApp
                                       ? ((double)accumulator.deliveredSum / accumulator.deliveredCount)
                                       : 0.0;
 
-            return new StoreAggregatedData(accumulator.storeId, avgProcessing, avgShipped, avgDelivered, accumulator.lat, accumulator.lng);
+            return new StoreAggregatedData(accumulator.storeId, accumulator.processingCount, avgProcessing, avgShipped, avgDelivered, accumulator.lat, accumulator.lng);
         }
 
         @Override
@@ -246,11 +248,11 @@ public class StoreTimingFlinkApp
         public String storeId = null;
         public double lat;
         public double lng;
-        public long processingCount = 0;
-        public long processingSum = 0;
-        public long shippedCount = 0;
-        public long shippedSum = 0;
-        public long deliveredCount = 0;
-        public long deliveredSum = 0;
+        public int processingCount = 0;
+        public int processingSum = 0;
+        public int shippedCount = 0;
+        public int shippedSum = 0;
+        public int deliveredCount = 0;
+        public int deliveredSum = 0;
     }
 }
